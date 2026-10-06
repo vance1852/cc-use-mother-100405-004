@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -49,3 +49,4 @@ class WriteReceipt:
     resource_type: str
     resource_id: str
     replayed: bool
+    response: dict[str, Any] = field(default_factory=dict)

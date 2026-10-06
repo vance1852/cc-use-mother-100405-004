@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .errors import DomainError, ValidationError
+from .roadmap import RoadmapService
 from .service import DomainService
 from .storage import Database
 
@@ -48,6 +49,91 @@ def route(service: DomainService, method: str, path: str, body: dict[str, Any] |
             query = parse_qs(parsed.query)
             after = int(query.get("after_sequence", ["0"])[0])
             return 200, {"items": service.audit_events(after)}
+        if method == "POST" and parsed.path == "/roadmap/bottlenecks":
+            receipt = service.register_bottleneck(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/dependencies":
+            receipt = service.add_dependency(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/commitments":
+            receipt = service.commit_team(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/solutions":
+            receipt = service.register_solution(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/solution-activations":
+            receipt = service.activate_solution(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/evidence":
+            receipt = service.register_evidence(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/facilities":
+            receipt = service.register_facility(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/windows":
+            receipt = service.register_window(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/resource-confirmations":
+            receipt = service.confirm_resource(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/lease-releases":
+            receipt = service.release_lease(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/test-batches":
+            receipt = service.record_test_batch(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/metric-downgrades":
+            receipt = service.downgrade_metric(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "POST" and parsed.path == "/roadmap/adjudication-resolutions":
+            receipt = service.resolve_adjudication(actor_id=actor_id, **body)
+            return 200 if receipt.replayed else 201, receipt.__dict__
+        if method == "GET" and parsed.path == "/roadmap/roadmap":
+            query = parse_qs(parsed.query)
+            site_id = query.get("site_id", [""])[0]
+            if not site_id:
+                raise ValidationError("site_id 不能为空")
+            return 200, service.roadmap(actor_id, site_id)
+        if method == "GET" and parsed.path == "/roadmap/critical-path":
+            query = parse_qs(parsed.query)
+            site_id = query.get("site_id", [""])[0]
+            if not site_id:
+                raise ValidationError("site_id 不能为空")
+            return 200, service.critical_path(actor_id, site_id)
+        if method == "GET" and parsed.path == "/roadmap/waiting-reasons":
+            query = parse_qs(parsed.query)
+            bottleneck_id = query.get("bottleneck_id", [""])[0]
+            if not bottleneck_id:
+                raise ValidationError("bottleneck_id 不能为空")
+            return 200, service.waiting_reasons(actor_id, bottleneck_id)
+        if method == "GET" and parsed.path == "/roadmap/switch-cost":
+            query = parse_qs(parsed.query)
+            solution_id = query.get("solution_id", [""])[0]
+            if not solution_id:
+                raise ValidationError("solution_id 不能为空")
+            return 200, service.switch_cost(actor_id, solution_id)
+        if method == "GET" and parsed.path == "/roadmap/evidence":
+            query = parse_qs(parsed.query)
+            solution_id = query.get("solution_id", [""])[0]
+            if not solution_id:
+                raise ValidationError("solution_id 不能为空")
+            return 200, {"items": service.list_evidence(actor_id, solution_id)}
+        if method == "GET" and parsed.path == "/roadmap/leases":
+            query = parse_qs(parsed.query)
+            window_id = query.get("window_id", [""])[0]
+            if not window_id:
+                raise ValidationError("window_id 不能为空")
+            return 200, service.list_leases(actor_id, window_id)
+        if method == "GET" and parsed.path == "/roadmap/adjudications":
+            query = parse_qs(parsed.query)
+            status_filter = query.get("status", [None])[0]
+            return 200, {"items": service.list_adjudications(actor_id, status_filter)}
+        if method == "GET" and parsed.path == "/roadmap/same-origin":
+            query = parse_qs(parsed.query)
+            site_id = query.get("site_id", [""])[0]
+            if not site_id:
+                raise ValidationError("site_id 不能为空")
+            return 200, {"items": service.same_origin_groups(actor_id, site_id)}
         return 404, {"error": "route_not_found", "message": "接口不存在"}
     except DomainError as exc:
         return exc.status, {"error": exc.code, "message": str(exc)}
@@ -99,7 +185,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     database = Database(args.database)
-    Handler.service = DomainService(database)
+    Handler.service = RoadmapService(database)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     try:
         server.serve_forever()
