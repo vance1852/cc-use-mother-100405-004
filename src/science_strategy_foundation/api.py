@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .errors import DomainError, ValidationError
+from .roadmap import RoadmapService, route_roadmap
 from .service import DomainService
 from .storage import Database
 
@@ -48,6 +49,9 @@ def route(service: DomainService, method: str, path: str, body: dict[str, Any] |
             query = parse_qs(parsed.query)
             after = int(query.get("after_sequence", ["0"])[0])
             return 200, {"items": service.audit_events(after)}
+        if parsed.path.startswith("/roadmap"):
+            roadmap = RoadmapService(service.database, service.clock)
+            return route_roadmap(roadmap, method, parsed, body, actor_id)
         return 404, {"error": "route_not_found", "message": "接口不存在"}
     except DomainError as exc:
         return exc.status, {"error": exc.code, "message": str(exc)}
